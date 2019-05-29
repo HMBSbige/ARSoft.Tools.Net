@@ -19,10 +19,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -73,25 +72,25 @@ namespace ARSoft.Tools.Net.Dns
 		/// <param name="udpListenerCount"> The count of threads listings on udp, 0 to deactivate udp </param>
 		/// <param name="tcpListenerCount"> The count of threads listings on tcp, 0 to deactivate tcp </param>
 		public DnsServer(int udpListenerCount, int tcpListenerCount)
-			: this(IPAddress.Any, udpListenerCount, tcpListenerCount) {}
+			: this(IPAddress.Any, udpListenerCount, tcpListenerCount) { }
 
-        /// <summary>
-        ///   Creates a new dns server instance
-        /// </summary>
-        /// <param name="bindAddress"> The address, on which should be listend </param>
-        /// <param name="udpListenerCount"> The count of threads listings on udp, 0 to deactivate udp </param>
-        /// <param name="tcpListenerCount"> The count of threads listings on tcp, 0 to deactivate tcp </param>
-        /// <param name="port"> Listening port </param>
-        public DnsServer(IPAddress bindAddress, int udpListenerCount, int tcpListenerCount, int port = _DNS_PORT)
-			: this(new IPEndPoint(bindAddress, port), udpListenerCount, tcpListenerCount) {}
+		/// <summary>
+		///   Creates a new dns server instance
+		/// </summary>
+		/// <param name="bindAddress"> The address, on which should be listend </param>
+		/// <param name="udpListenerCount"> The count of threads listings on udp, 0 to deactivate udp </param>
+		/// <param name="tcpListenerCount"> The count of threads listings on tcp, 0 to deactivate tcp </param>
+		/// <param name="port"> Listening port </param>
+		public DnsServer(IPAddress bindAddress, int udpListenerCount, int tcpListenerCount, int port = _DNS_PORT)
+			: this(new IPEndPoint(bindAddress, port), udpListenerCount, tcpListenerCount) { }
 
-        /// <summary>
-        ///   Creates a new dns server instance
-        /// </summary>
-        /// <param name="bindEndPoint"> The endpoint, on which should be listend </param>
-        /// <param name="udpListenerCount"> The count of threads listings on udp, 0 to deactivate udp </param>
-        /// <param name="tcpListenerCount"> The count of threads listings on tcp, 0 to deactivate tcp </param>
-        public DnsServer(IPEndPoint bindEndPoint, int udpListenerCount, int tcpListenerCount)
+		/// <summary>
+		///   Creates a new dns server instance
+		/// </summary>
+		/// <param name="bindEndPoint"> The endpoint, on which should be listend </param>
+		/// <param name="udpListenerCount"> The count of threads listings on udp, 0 to deactivate udp </param>
+		/// <param name="tcpListenerCount"> The count of threads listings on tcp, 0 to deactivate tcp </param>
+		public DnsServer(IPEndPoint bindEndPoint, int udpListenerCount, int tcpListenerCount)
 		{
 			_bindEndPoint = bindEndPoint;
 
@@ -247,6 +246,11 @@ namespace ARSoft.Tools.Net.Dns
 				{
 					response = await ProcessMessageAsync(query, ProtocolType.Udp, receiveResult.RemoteEndPoint);
 				}
+				catch (InvalidDataException ex)
+				{
+					OnExceptionThrownAsync(ex);
+					return;
+				}
 				catch (Exception ex)
 				{
 					OnExceptionThrownAsync(ex);
@@ -270,7 +274,7 @@ namespace ARSoft.Tools.Net.Dns
 					int maxLength = 512;
 					if (query.IsEDnsEnabled && message.IsEDnsEnabled)
 					{
-						maxLength = Math.Max(512, (int) message.EDnsOptions.UdpPayloadSize);
+						maxLength = Math.Max(512, (int)message.EDnsOptions.UdpPayloadSize);
 					}
 
 					while (length > maxLength)
@@ -392,7 +396,7 @@ namespace ARSoft.Tools.Net.Dns
 				{
 					client = await _tcpListener.AcceptTcpClientAsync();
 
-					ClientConnectedEventArgs clientConnectedEventArgs = new ClientConnectedEventArgs(ProtocolType.Tcp, (IPEndPoint) client.Client.RemoteEndPoint);
+					ClientConnectedEventArgs clientConnectedEventArgs = new ClientConnectedEventArgs(ProtocolType.Tcp, (IPEndPoint)client.Client.RemoteEndPoint);
 					await ClientConnected.RaiseAsync(this, clientConnectedEventArgs);
 
 					if (clientConnectedEventArgs.RefuseConnect)
@@ -440,7 +444,12 @@ namespace ARSoft.Tools.Net.Dns
 						DnsMessageBase response;
 						try
 						{
-							response = await ProcessMessageAsync(query, ProtocolType.Tcp, (IPEndPoint) client.Client.RemoteEndPoint);
+							response = await ProcessMessageAsync(query, ProtocolType.Tcp, (IPEndPoint)client.Client.RemoteEndPoint);
+						}
+						catch (InvalidDataException ex)
+						{
+							OnExceptionThrownAsync(ex);
+							return;
 						}
 						catch (Exception ex)
 						{
